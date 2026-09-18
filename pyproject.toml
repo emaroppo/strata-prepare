@@ -1,0 +1,68 @@
+[project]
+name = "strata-prepare"
+version = "0.1.0"
+description = "Getting raw data into the shape a catalog takes: preparers, the prepared index they write, and the contract they run against themselves"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    # The sample types a preparer produces and the index it writes.
+    "strata-contracts>=0.1,<0.2",
+    # The entry-point resolver, for preparers.
+    "strata-common>=0.1,<0.2",
+]
+
+[project.optional-dependencies]
+# The conformance suite is importable by plugins so they can run the
+# contract against their own preparer. The only thing here needing pytest.
+test = ["pytest>=8.0"]
+
+# The preparers every install has: a directory of files as they are. A
+# plugin registers here too.
+[project.entry-points."strata.preparers"]
+image-folder = "strata.prepare.folder:ImageFolder"
+frames-folder = "strata.prepare.folder:FramesFolder"
+text-folder = "strata.prepare.folder:TextFolder"
+
+[project.scripts]
+# Listing what is installed and running one over a source. Standard library
+# only beyond what the package depends on.
+strata-prepare = "strata.prepare.cli:main"
+
+# What developing this package alone needs beyond its extras. Inside the
+# strata workspace the root's group is used instead.
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+    "pyright>=1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+# The same set as every strata package: pinned, widened once, on purpose.
+select = ["E", "F", "I", "B", "SIM", "DTZ", "UP", "C4", "RUF"]
+
+[tool.ruff.lint.isort]
+# The namespace is one project however many repositories hold it, so a
+# sibling package sorts with this one and not with the third parties.
+known-first-party = ["strata"]
+
+[tool.pyright]
+include = ["strata"]
+pythonVersion = "3.13"
+venvPath = "."
+venv = ".venv"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# PEP 420 namespace: no strata/__init__.py in any package, or they stop merging
+packages = ["strata"]
