@@ -8,9 +8,16 @@ nothing else under the directory. This package never imports a catalog,
 and a catalog never imports it: what passes between them is the index,
 defined in `strata-contracts`.
 
+Not on PyPI: it installs from its repository at a release tag. uv takes a
+git source only for a package named directly, so the strata packages
+beneath it are named beside it.
+
 ```bash
-uv add strata-prepare
-uv add "strata-prepare[test]"        # the conformance suite, for a plugin's tests
+g=git+https://github.com/emaroppo
+uv add "strata-prepare @ $g/strata-prepare@v0.1.0"     \
+       "strata-contracts @ $g/strata-contracts@v0.1.0" \
+       "strata-common @ $g/strata-common@v0.1.0"
+uv add "strata-prepare[test] @ $g/strata-prepare@v0.1.0"   # the conformance suite, for a plugin's tests
 ```
 
 Depends on `strata-contracts` and `strata-common`. May not import
@@ -95,7 +102,7 @@ what enters a catalog is declared and prepared outside it (0040).
 ## Tests
 
 ```bash
-.github/sibling-wheels.sh contracts common   # the strata packages this one needs, until they are on an index
+.github/sibling-wheels.sh contracts common   # the strata packages this one needs, from their repositories
 uv sync --find-links dist --group dev --extra test
 uv run pytest
 ```
