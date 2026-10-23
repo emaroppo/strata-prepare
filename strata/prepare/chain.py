@@ -137,7 +137,7 @@ class Transform[P: StageParams = StageParams](Stage[P]):
 
 
 class Filter[P: StageParams = StageParams](Stage[P]):
-    """One item in, the same item or a :class:`Drop` out. Counted either way."""
+    """One item in, one item or a :class:`Drop` out. A drop is counted."""
 
     def keep(self, item: Item, source: Input) -> Item | Drop:
         raise NotImplementedError
