@@ -2,9 +2,10 @@
 
 A preparer reads what a corpus arrives as — a video, a mailbox, a folder —
 and writes files a sample type admits, with a prepared index naming each
-and what is known about it. A catalog ingests that index and nothing else;
-this package never imports one, and one never imports this. See
-``docs/adr/0040``.
+and what is known about it. A catalog ingests that index and nothing else.
+A preparation can also be a chain of stages (:mod:`.chain`), which the
+catalog runs itself. This package never imports a catalog. See
+``docs/adr/0040``, ``docs/adr/0046`` and ``docs/adr/0047``.
 
 **May import:** ``contracts``, ``common``, the standard library.
 
@@ -27,10 +28,10 @@ from .preparers import (
 )
 
 #: Modules a sibling may import by path beyond what is exported here
-#: (``docs/adr/0015``): the registry, whose ``entries`` tests patch; the
-#: folder preparers; what preparers share; the conformance suite, behind
-#: the test extra.
-PUBLIC_MODULES = frozenset({"conformance", "files", "folder", "preparers"})
+#: (``docs/adr/0015``): the stage engine, which the catalog runs; the
+#: registry, whose ``entries`` tests patch; the folder preparers; what
+#: preparers share; the conformance suite, behind the test extra.
+PUBLIC_MODULES = frozenset({"chain", "conformance", "files", "folder", "preparers"})
 
 __all__ = [
     "FramesFolder",
