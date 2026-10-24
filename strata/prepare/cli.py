@@ -1,10 +1,11 @@
 """strata-prepare: what can prepare a corpus here, and preparing one."""
 
 import argparse
-import json
-import sys
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
+
+from strata.common.cli import emit
+from strata.common.cli import run as run_command
 
 from .preparers import PreparerError, available, for_source, resolve, run
 
@@ -30,11 +31,7 @@ class RunReport:
 def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
-    try:
-        return args.run(args) or 0
-    except PreparerError as e:
-        print(str(e), file=sys.stderr)
-        return 1
+    return run_command(lambda: args.run(args), PreparerError)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -71,12 +68,12 @@ def _preparers(args) -> int:
         cls = resolve(name)
         entries.append(PreparerEntry(name, sorted(cls.sources), cls.produces))
 
-    def render():
+    def render(entries):
         for e in entries:
             yield f"{e.name:<14} reads {', '.join('.' + x for x in e.reads) or '-'} -> {e.produces}"
         yield "Read from what is installed. A preparer that needs a decoder is a plugin."
 
-    _emit(args, [asdict(e) for e in entries], render)
+    emit(entries, render, as_json=args.json)
     return 0
 
 
@@ -108,7 +105,7 @@ def _run(args) -> int:
         left_out=preparer.report(),
     )
 
-    def render():
+    def render(report):
         yield (
             f"{report.preparer}: {report.sources} sources -> {report.written} "
             f"{report.produces} files in {report.index}"
@@ -118,17 +115,8 @@ def _run(args) -> int:
         for what, count in report.left_out.items():
             yield f"  {count} {what}"
 
-    _emit(args, asdict(report), render)
+    emit(report, render, as_json=args.json)
     return 0
-
-
-def _emit(args, record, render) -> None:
-    """Render the record for a person, or print it whole for a program."""
-    if args.json:
-        print(json.dumps(record, indent=2, sort_keys=True))
-        return
-    for line in render():
-        print(line)
 
 
 __all__ = ["main"]
