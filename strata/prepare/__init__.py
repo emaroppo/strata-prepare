@@ -1,17 +1,8 @@
 """Getting raw data into the shape a catalog takes.
 
-A preparer reads what a corpus arrives as — a video, a mailbox, a folder —
-and writes files a sample type admits, with a prepared index naming each
-and what is known about it. A catalog ingests that index and nothing else.
-A preparation can also be a chain of stages (:mod:`.chain`), which the
-catalog runs itself. This package never imports a catalog. See
-``docs/adr/0040``, ``docs/adr/0046`` and ``docs/adr/0047``.
-
-**May import:** ``contracts``, ``common``, the standard library.
-
-**May not import:** ``strata.catalog``, ``modelling``, ``labeller``, Label
-Studio, or any ML framework. A preparer that needs a decoder carries it as
-its own plugin.
+A preparer writes files a sample type admits and an index naming each; a
+chain of stages (:mod:`.chain`) is run by the catalog. Nothing here imports
+a catalog. See ``docs/adr/0040``, ``docs/adr/0046`` and ``docs/adr/0047``.
 """
 
 from .folder import FramesFolder, ImageFolder, TextFolder
@@ -27,10 +18,7 @@ from .preparers import (
     save_index,
 )
 
-#: Modules a sibling may import by path beyond what is exported here
-#: (``docs/adr/0015``): the stage engine, which the catalog runs; the
-#: registry, whose ``entries`` tests patch; the folder preparers; what
-#: preparers share; the conformance suite, behind the test extra.
+#: Modules a sibling may import by path beyond the exports. docs/adr/0015
 PUBLIC_MODULES = frozenset({"chain", "conformance", "files", "folder", "preparers"})
 
 __all__ = [

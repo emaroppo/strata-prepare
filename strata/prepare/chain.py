@@ -1,17 +1,8 @@
 """A preparation as a chain of stages, declared in a spec and run one input at a time.
 
-A stage records facts about the occurrence it reads, or changes the body,
-and nothing else: it never writes an annotation. Stages are plugins under
-``strata.prepare_stages``, split by cardinality into transforms (one in,
-one out), filters (one in, none or one out) and splits (one in, many out).
-Each declares the kind it accepts and the kind it produces, so a chain in
-the wrong order is refused before anything is read. The chain runs on each
-input in memory, and only what its last stage yields leaves it.
-
-Nothing here knows a catalog. The catalog hands :func:`run_chain` its
-inputs as local files and stores what comes back; canonical form, the
-sample's checksum and its rows are the catalog's. See ``docs/adr/0045``,
-``docs/adr/0046`` and ``docs/adr/0047``.
+A stage records facts or changes a body, never an annotation; the catalog
+hands :func:`run_chain` local files and stores what comes back. See
+``docs/adr/0045``, ``docs/adr/0046`` and ``docs/adr/0047``.
 """
 
 import hashlib
@@ -52,12 +43,9 @@ class Input:
 
     #: The raw checksum: the input's identity, and the origin row's input.
     checksum: str
-    #: A local file holding the bytes. Named by checksum, and possibly
-    #: without an extension (an Enron maildir file has none), so no stage
-    #: may key on its suffix.
+    #: A local file holding the bytes; named by checksum, so no stage may key on its suffix.
     path: Path
-    #: Every ``collection/path`` naming these bytes, sorted. Context for a
-    #: stage that wants it; none is privileged.
+    #: Every ``collection/path`` naming these bytes, sorted; none is privileged.
     names: tuple[str, ...] = ()
 
 
@@ -96,18 +84,14 @@ class Stage[P: StageParams = StageParams]:
 
     #: How a spec names this stage.
     name: ClassVar[str] = ""
-    #: Changes whenever what the stage produces from the same input changes.
-    #: Part of the chain's identity, so a new version is a different chain.
+    #: Changes whenever the output from the same input changes; part of the chain's identity.
     version: ClassVar[str] = ""
     #: The kind of item this reads: ``bytes`` or a registered sample type.
     accepts: ClassVar[str] = BYTES
     #: The kind it hands on. A sample type name.
     produces: ClassVar[str] = ""
 
-    #: The model a spec's keys for this stage are validated into. A stage
-    #: with parameters subclasses :class:`StageParams`, names it here, and
-    #: parameterises its base with it (``Filter[MyParams]``) so ``params``
-    #: type-checks.
+    #: What a spec's keys validate into; name it here and in the base (``Filter[MyParams]``).
     Params: ClassVar[type[StageParams]] = StageParams
 
     def __init__(self, params: P | None = None):
@@ -116,9 +100,7 @@ class Stage[P: StageParams = StageParams]:
     def rules(self) -> dict[str, str]:
         """Every rule file this stage reads, by name, as the sha256 of its bytes.
 
-        A rule edited in place changes what the stage does without changing
-        its version or the spec, so its digest is part of the chain's
-        identity. See ``docs/adr/0045``.
+        Part of the chain's identity. See ``docs/adr/0045``.
         """
         return {}
 
@@ -222,13 +204,9 @@ class Chain:
     stages: tuple[Stage, ...]
     #: Which distribution provided each stage, and at which version.
     producers: dict[str, dict[str, str]]
-    #: Every stage's rule files, by stage, as digests. Read once, when the
-    #: chain is loaded, so a run records the rules it ran with even if a
-    #: file is edited while it runs.
+    #: Every stage's rule files as digests, read once when the chain is loaded.
     rules: dict[str, dict[str, str]]
-    #: The same chain: the same spec, stage versions and rule files. What
-    #: "the same spec" means when a run asks whether its inputs were already
-    #: prepared. See ``docs/adr/0045``.
+    #: The same spec, stage versions and rule files: the same chain. docs/adr/0045
     identity: str
 
     @classmethod
@@ -296,10 +274,9 @@ class Chain:
     # -- what a run records -----------------------------------------------
 
     def canonical(self) -> bytes:
-        """The spec as canonical JSON, with every default written out.
+        """The spec as canonical JSON, every default written out.
 
-        An omitted parameter and a written default are the same spec. See
-        ``docs/adr/0037`` and ``docs/adr/0046``.
+        See ``docs/adr/0037`` and ``docs/adr/0046``.
         """
         return _canonical(self.spec, self.stages)
 
@@ -325,11 +302,8 @@ def _canonical(spec: Spec, stages) -> bytes:
 
 
 def _fits(given: str, wanted: str) -> bool:
-    """Whether an item of kind ``given`` may go where ``wanted`` is read.
-
-    A kind is ``bytes`` or a sample type, and a subtype fits where its
-    parent does: an email is a text.
-    """
+    """Whether an item of kind ``given`` may go where ``wanted`` is read; a
+    subtype fits where its parent does."""
     if given == wanted:
         return True
     if BYTES in (given, wanted):
@@ -353,8 +327,7 @@ class Produced:
     input: str
     #: Position among this input's outputs; 0 unless a stage split it.
     index: int
-    #: As the last stage left it. Not canonicalised: canonical form is the
-    #: catalog's (``docs/adr/0010``).
+    #: As the last stage left it; canonical form is the catalog's. docs/adr/0010
     body: bytes
     #: Facts about the occurrence, for the origin row (``docs/adr/0049``).
     facts: dict[str, Any]
@@ -375,19 +348,17 @@ SPLIT_NOTHING = "nothing"
 
 @dataclass
 class Counts:
-    """What a run did with its inputs, counted rather than listed (``docs/adr/0045``).
+    """What a run did with its inputs, counted. See ``docs/adr/0045``.
 
-    ``inputs == produced + sum(emptied.values())`` once a run is over. An
-    item dropped from an input that still produced something is in
-    ``dropped``, which is not part of that sum.
+    ``inputs == produced + sum(emptied.values())`` once a run is over;
+    ``dropped`` counts items from inputs that still produced, outside that sum.
     """
 
     inputs: int = 0
     produced: int = 0
     emptied: Counter = field(default_factory=Counter)
     dropped: Counter = field(default_factory=Counter)
-    #: Outputs with the same bytes as an earlier output of the same input:
-    #: one sample, one origin row, so their facts are not all kept.
+    #: Outputs with the same bytes as an earlier output of the same input: one sample.
     repeated: int = 0
 
     def balanced(self) -> bool:
@@ -409,10 +380,9 @@ def run_chain(
 ) -> Iterator[Produced | Emptied]:
     """Run ``chain`` on each input in turn, yielding what each produced or why it produced nothing.
 
-    A checksum handed over twice is refused: the caller collapses names to
-    distinct checksums first. A stage that raises aborts the run, naming
-    the input and the stage, because a raise is a fault in the code and
-    not a drop. ``counts`` is filled as the run goes.
+    A checksum handed over twice is refused. A stage that raises aborts the
+    run, since a raise is a fault in the code and not a drop. ``counts`` is
+    filled as the run goes.
     """
     counts = counts if counts is not None else Counts()
     seen: set[str] = set()

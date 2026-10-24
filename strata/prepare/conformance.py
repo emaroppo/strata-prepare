@@ -1,34 +1,8 @@
 """An executable specification of the preparer contract.
 
-A preparer is the one place bytes are invented rather than carried
-(``docs/adr/0033``). Written as tests a plugin runs against its own
-preparer:
-
-.. code-block:: python
-
-    from strata.prepare.conformance import PreparerContract
-
-    class TestMyPreparer(PreparerContract):
-        @pytest.fixture
-        def preparer(self):
-            return MyPreparer()
-
-        @pytest.fixture
-        def source(self, tmp_path):
-            path = tmp_path / "corpus.eml"
-            path.write_bytes(...)
-            return path
-
-Two fixtures, and the plugin inherits the suite. A preparer to which where
-a source sits matters overrides a third, ``root``, the directory the source
-is under.
-
-**Determinism is the one that matters.** A corpus that comes out different
-on a second run re-checksums and detaches its annotations. See
-``docs/adr/0010``.
-
-Importing this pulls in pytest, so it lives behind the ``test`` extra and
-should only ever be imported from a test module.
+A plugin subclasses :class:`PreparerContract` in its tests and supplies the
+``preparer`` and ``source`` fixtures (``root`` where placement matters).
+Behind the ``test`` extra, since it imports pytest. See ``docs/adr/0033``.
 """
 
 from pathlib import Path
@@ -71,11 +45,7 @@ class PreparerContract:
 
     @pytest.fixture
     def sample_type(self, preparer):
-        """The type this claims to produce, as a catalog resolves it.
-
-        Resolved rather than declared, so a preparer naming a type nothing
-        installed provides fails here rather than at the first ingest.
-        """
+        """The type this claims to produce, resolved as a catalog would. See ``docs/adr/0033``."""
         return resolve(type(preparer).produces)()
 
     # -- declarations ---------------------------------------------------
@@ -97,8 +67,7 @@ class PreparerContract:
         assert preparer.allows(source)
 
     def test_it_refuses_what_it_does_not_read(self, preparer, source, tmp_path):
-        # A source it cannot read is refused rather than skipped.
-        # docs/adr/0033, docs/adr/0036
+        # Refused rather than skipped. docs/adr/0036
         foreign = tmp_path / "elsewhere.unlikely-suffix"
         foreign.write_bytes(b"not for you")
         with pytest.raises(PreparerError):
@@ -125,8 +94,7 @@ class PreparerContract:
     ):
         """What a catalog checks before it takes anything, checked here first.
 
-        Every file named, admitted, and with the metadata its type requires,
-        or a catalog refuses the whole corpus. See ``docs/adr/0040``.
+        See ``docs/adr/0040``.
         """
         out = tmp_path / "out"
         index = run(preparer, [source], out, root=root)
@@ -137,7 +105,7 @@ class PreparerContract:
         out = tmp_path / "out"
         index = run(preparer, [source], out, root=root)
         assert set(index.samples) == set(_tree(out))
-        # And it survives the round trip to disk, which is what a catalog reads
+        # The round trip to disk is what a catalog reads
         loaded = load_index(out)
         assert loaded is not None
         assert loaded.samples.keys() == index.samples.keys()
@@ -151,10 +119,7 @@ class PreparerContract:
         assert _tree(first) == _tree(second)
 
     def test_a_re_run_changes_nothing(self, preparer, source, root, tmp_path):
-        """Converting a source directory that has grown must not disturb it.
-
-        See ``docs/adr/0010``.
-        """
+        """A re-run over a grown source directory disturbs nothing. See ``docs/adr/0010``."""
         out = tmp_path / "out"
         run(preparer, [source], out, root=root)
         before = _tree(out)

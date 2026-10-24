@@ -8,10 +8,9 @@ CHUNK = 1 << 20
 
 
 def checksum_of(path: Path) -> str:
-    """The sha256 of a file's bytes, the way a catalog addresses a sample.
+    """The sha256 of a file's bytes, as a catalog addresses a sample.
 
-    For naming what a preparer writes after what it read, so a renamed
-    source prepares to the same place (``docs/adr/0033``).
+    See ``docs/adr/0001`` and ``docs/adr/0033``.
     """
     digest = hashlib.sha256()
     with Path(path).open("rb") as f:

@@ -1,6 +1,7 @@
 """strata-prepare: what can prepare a corpus here, and preparing one."""
 
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -77,6 +78,28 @@ def _preparers(args) -> int:
     return 0
 
 
+def _ticker(label: str):
+    """A one-line progress display on stderr, for a terminal only.
+
+    Returns ``(show, done)``: ``show(text)`` redraws the line, ``done()``
+    ends it. See ``docs/adr/0031``.
+    """
+    if not sys.stderr.isatty():
+        return (lambda text: None), (lambda: None)
+    shown = False
+
+    def show(text: str) -> None:
+        nonlocal shown
+        shown = True
+        print(f"\r{label} {text}", end="", file=sys.stderr, flush=True)
+
+    def done() -> None:
+        if shown:
+            print(file=sys.stderr, flush=True)
+
+    return show, done
+
+
 def _run(args) -> int:
     source = args.source
     if not source.is_dir():
@@ -95,7 +118,17 @@ def _run(args) -> int:
     if not admitted:
         raise PreparerError(f"{cls.name} reads none of the files in {source}.")
 
-    index = run(preparer, admitted, args.out, root=source)
+    show, done = _ticker("preparing")
+    total = len(admitted)
+    count = 0
+
+    def on_source(_path: Path) -> None:
+        nonlocal count
+        count += 1
+        show(f"{count:,}/{total:,}")
+
+    index = run(preparer, admitted, args.out, root=source, on_source=on_source)
+    done()
     report = RunReport(
         preparer=cls.name,
         produces=cls.produces,

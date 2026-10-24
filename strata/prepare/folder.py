@@ -1,11 +1,8 @@
 """A directory of files that are already what a type stores.
 
-The preparation such a corpus needs is a declaration, not a conversion:
-each file is carried into the output where it sat, hardlinked where the
-filesystem allows and copied where it does not, and the index says what
-type they are. Frames say which video too, from the directory each sits
-in, which is the one thing a catalog used to guess for itself. See
-``docs/adr/0023`` and ``docs/adr/0040``.
+Each file is carried into the output where it sat, and the index says what
+type they are; frames say which video too, from the directory each sits in.
+See ``docs/adr/0023`` and ``docs/adr/0040``.
 """
 
 import os
@@ -20,11 +17,8 @@ from .preparers import Prepared, Preparer, PreparerError
 
 
 def carry(source: Path, target: Path) -> None:
-    """``source``'s bytes at ``target``, sharing its inode where possible.
-
-    Nothing is rewritten where ``target`` already holds these bytes, so a
-    re-run over a grown directory touches only what is new.
-    """
+    """``source``'s bytes at ``target``, hardlinked where possible; bytes
+    already there are left alone. See ``docs/adr/0010``."""
     if target.exists():
         if os.path.samefile(source, target) or target.read_bytes() == source.read_bytes():
             return
@@ -62,10 +56,8 @@ class ImageFolder(FolderPreparer):
 class FramesFolder(FolderPreparer):
     """Frames already extracted, one directory per video.
 
-    The directory is the video, however deep it sits, so a video's frames
-    stay on one side of a split frozen with ``group_by = "video"``. A frame
-    directly in the root belongs to no video and is refused rather than
-    made a group of one.
+    The directory is the video, however deep it sits; a frame directly in
+    the root is refused. See ``docs/adr/0023`` and ``docs/adr/0040``.
     """
 
     name: ClassVar[str] = "frames-folder"
@@ -85,10 +77,8 @@ class FramesFolder(FolderPreparer):
 class TextFolder(FolderPreparer):
     """A directory of documents with no annotations riding on them.
 
-    Carried byte for byte; the catalog stores them in its canonical form.
-    A corpus arriving with spans needs a preparer that writes canonical
-    text itself, since the spans address what it writes. See
-    ``docs/adr/0040``.
+    Carried byte for byte; one arriving with spans needs a preparer that
+    writes canonical text. See ``docs/adr/0040``.
     """
 
     name: ClassVar[str] = "text-folder"

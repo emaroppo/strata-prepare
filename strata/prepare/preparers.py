@@ -1,12 +1,8 @@
 """Getting a corpus into the shape a sample type declares.
 
-A preparer converts what a corpus arrives as into files a type admits,
-writes them and a prepared index of what it knew about each, and stops; a
-catalog ingests what the index names. Each ships as its own distribution,
-and nothing here imports a catalog. What a preparer promises, and
-:mod:`strata.prepare.conformance` checks: its output is admitted by the
-type it declares, meets that type's metadata, and is the same bytes on a
-second run. See ``docs/adr/0033`` and ``docs/adr/0040``.
+A preparer writes files a type admits and an index of what it knew about
+each, and stops; a catalog ingests what the index names. Each ships as its
+own distribution. See ``docs/adr/0033`` and ``docs/adr/0040``.
 """
 
 from collections.abc import Iterable
@@ -42,15 +38,9 @@ class Prepared:
 
     #: The file written, inside the output directory.
     path: Path
-    #: Recorded on the sample at ingest, and checked there against the
-    #: type's ``Metadata``. What only the preparer knows — a sender, a
-    #: capture time, the frame's index in its video, and the video itself,
-    #: under a key a project can name as its ``group_by``.
+    #: Recorded on the sample at ingest, checked against the type's ``Metadata``. docs/adr/0040
     metadata: dict = field(default_factory=dict)
-    #: The annotation this sample arrived with, where the corpus came
-    #: labelled. A candidate for a reviewer to correct, never an answer
-    #: (``docs/adr/0028``). Its offsets address the bytes written, so a
-    #: text preparer shipping one writes canonical text (``docs/adr/0040``).
+    #: An annotation the corpus arrived with: a candidate, never an answer. docs/adr/0028
     value: AnyValue | None = None
 
 
@@ -60,8 +50,7 @@ class Preparer:
     #: How a project names this preparer.
     name: ClassVar[str] = ""
 
-    #: The registered sample type this produces, by name. The output has to
-    #: satisfy it: its extensions and its metadata. docs/adr/0033
+    #: The sample type this produces, by name; the output has to satisfy it. docs/adr/0033
     produces: ClassVar[str] = ""
 
     #: Extensions this consumes, lowercase and without the dot.
@@ -83,21 +72,14 @@ class Preparer:
         return bool(suffix) and suffix in self.sources
 
     def report(self) -> dict[str, int]:
-        """What this preparer did not carry across, for a caller to print.
-
-        Counted rather than logged. See ``docs/adr/0036``.
-        """
+        """What this preparer did not carry across, counted. See ``docs/adr/0036``."""
         return {}
 
     def prepare(self, source: Path, out_dir: Path, *, root: Path) -> Iterable[Prepared]:
-        """Turn one source file into the samples it holds.
+        """Turn one source file into the samples it holds, written under ``out_dir``.
 
-        One in, many out: a mailbox is a corpus, a video is a corpus.
-        ``root`` is the source directory ``source`` sits under, for a
-        preparer to whom where a file sits means something. Write into
-        ``out_dir`` and return what was written. Re-running over a source
-        already converted must produce the same bytes at the same paths.
-        See ``docs/adr/0010``.
+        ``root`` is the source directory ``source`` sits under. A re-run
+        must produce the same bytes at the same paths. See ``docs/adr/0010``.
         """
         raise NotImplementedError
 
@@ -110,8 +92,7 @@ class Preparer:
 def load_index(out_dir: Path) -> PreparedIndex | None:
     """The index in ``out_dir``, or None where nothing was prepared there yet.
 
-    One that cannot be read is refused rather than replaced: preparing
-    into it would forget every file it named. See ``docs/adr/0036``.
+    One that cannot be read is refused rather than replaced. See ``docs/adr/0036``.
     """
     path = Path(out_dir) / PREPARED_NAME
     if not path.exists():
@@ -139,9 +120,7 @@ def save_index(index: PreparedIndex, out_dir: Path) -> Path:
 def relative_key(path: Path, root: Path) -> str:
     """How a file is named in the index: relative to the root, posix-style.
 
-    A file outside the root has no name there, and is refused: an index
-    that named it would point a catalog outside the corpus. See
-    ``docs/adr/0033``.
+    A file outside the root is refused. See ``docs/adr/0033``.
     """
     path, root = Path(path), Path(root)
     try:
@@ -223,29 +202,23 @@ def available() -> dict[str, str]:
 
 
 def resolve(name: str) -> type[Preparer]:
-    """The class a preparer name refers to.
+    """The class a preparer name refers to; a name registered twice is refused.
 
-    A name registered twice is refused rather than resolved by whichever was
-    loaded first. See ``docs/adr/0033``.
+    See ``docs/adr/0033``.
     """
     entry = plugins.find(entries(), name, what="preparer", error=PreparerError)
     return plugins.load(entry, Preparer, error=PreparerError)
 
 
 def for_source(produces: str, path: Path) -> type[Preparer]:
-    """The preparer that turns this file into ``produces``.
-
-    Resolved from the pair, since an extension alone is ambiguous across
-    types; ambiguity is refused with both names rather than picked. See
-    ``docs/adr/0033``.
-    """
+    """The preparer that turns this file into ``produces``; two candidates are
+    refused, not picked. See ``docs/adr/0033``."""
     candidates = []
     for name in sorted(available()):
         try:
             cls = resolve(name)
         except PreparerError:
-            # A plugin whose import fails is not this call's problem to
-            # report — resolve() by name says so much more usefully.
+            # A plugin that fails to import is reported by resolve(), not here
             continue
         if cls.produces == produces and cls().allows(path):
             candidates.append(cls)
